@@ -69,10 +69,15 @@ io.on('connection', function(socket){
 	  rooms.emit("CR_setPos",data);
   });
 		//Client´s move update
-  socket.on("CS_move",function(data){
-	  console.log("Client moveing:");
+  socket.on("CS_moveTop",function(data){
+	  console.log("Top Client moveing:");
 	  console.log(data);
-	  rooms.emit("SR_move",data);
+	  rooms.emit("SR_moveTop",data);
+  });
+  socket.on("CS_moveBot",function(data){
+	  console.log("Bottom Client moveing:");
+	  console.log(data);
+	  rooms.emit("SR_moveBot",data);
   });
 		//client´s parameters configuration
   socket.on("CS_reqConfig",function(data){
