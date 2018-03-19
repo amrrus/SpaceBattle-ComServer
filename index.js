@@ -2,7 +2,10 @@ var app = require('express')();
 
 var server = require('http').createServer(app);
 
-var io = require('socket.io')(server);
+var io = require('socket.io')(server, {
+	pingInterval: 300,
+	pingTimeout: 20000
+});
 
 app.get('/hello', function(req, res){
   res.status(200).send('<h1>Hello world</h1>');
@@ -65,7 +68,7 @@ io.on('connection', function(socket){
   });
 		//possition update events
   socket.on('SS_setPos',function(data){
-	  //console.log(data);
+	  console.log(data);
 	  rooms.emit("CR_setPos",data);
   });
 		//Client´s move update
@@ -74,7 +77,7 @@ io.on('connection', function(socket){
 	  console.log(data);
 	  rooms.emit("SR_moveTop",data);
   });
-  socket.on("CS_moveBot",function(data){
+    socket.on("CS_moveBot",function(data){
 	  console.log("Bottom Client moveing:");
 	  console.log(data);
 	  rooms.emit("SR_moveBot",data);
@@ -101,4 +104,3 @@ io.on('connection', function(socket){
 server.listen(3000, function(){
   console.log('listening on *:3000');
 });
-
