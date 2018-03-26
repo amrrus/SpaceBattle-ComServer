@@ -1,3 +1,4 @@
+var exec = require('child_process').exec;
 var app = require('express')();
 
 var server = require('http').createServer(app);
@@ -102,5 +103,11 @@ io.on('connection', function(socket){
 
 
 server.listen(3000, function(){
+	exec('java -cp "physicsServer.jar" physics_server.Main', (err, stdout, stderr) => {
+		if(err)
+			console.log(err);
+		else
+			console.log("java running")
+	})
   console.log('listening on *:3000');
 });
