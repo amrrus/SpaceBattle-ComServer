@@ -1,113 +1,148 @@
-var exec = require('child_process').exec;
-var app = require('express')();
+var _ = require('lodash');
+var Room = require('./classes').Room;
 
+var app = require('express')();
 var server = require('http').createServer(app);
 
 var io = require('socket.io')(server, {
-	pingInterval: 300,
-	pingTimeout: 20000
+    pingInterval: 300,
+    pingTimeout: 20000
 });
 
-app.get('/hello', function(req, res){
-  res.status(200).send('<h1>Hello world</h1>');
-});
-
-app.get('/', function(req, res){
-	var ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    console.log('Conexion express: '+ ip);
-	res.sendFile(__dirname + '/index.html');
-});
-
-	
-
-var room="1";
-var rooms=io.sockets.in(room);
-var sockets=[null,null,null];
-var socketsLength=3;
-
-io.on('connection', function(socket){
-  console.log('Connection established on socket.io');
-  var idClient=socketsLength;
-  for (var i = 0; i < socketsLength; i++) {
-	  if(sockets[i]==null){
-		  sockets[i]=socket;
-		  idClient=i;
-		  break;
-	  }
-  }
-  socket.join(room);
-  socket.emit('CR_setId',idClient);
-  
-  socket.on('disconnect', function(){
-    console.log('Connection closed on socket.io');
-	sockets[sockets.indexOf(socket)]=null;
-
-  });
-		//Asteroids events
-  socket.on('SS_createAst',function(data){
-	  console.log("Asteroid created: ");
-	  console.log(data);
-	  rooms.emit('CR_createAst',data);
-  });
-  
-  socket.on("SS_deleteAst",function(data){
-	  console.log("Asteroid deleted: ");
-	  console.log(data);
-	  rooms.emit("CR_deleteAst",data);
-  });
-		//Shots events
-  socket.on('SS_createShot',function(data){
-	  console.log("Shot created: ");
-	  console.log(data);
-	  rooms.emit('CR_createShot',data);
-  });
-  
-  socket.on("SS_deleteShot",function(data){
-	  console.log("Shot deleted: ");
-	  console.log(data);
-	  rooms.emit("CR_deleteShot",data);
-  });
-		//possition update events
-  socket.on('SS_setPos',function(data){
-	  console.log(data);
-	  rooms.emit("CR_setPos",data);
-  });
-		//Client´s move update
-  socket.on("CS_moveTop",function(data){
-	  console.log("Top Client moveing:");
-	  console.log(data);
-	  rooms.emit("SR_moveTop",data);
-  });
-    socket.on("CS_moveBot",function(data){
-	  console.log("Bottom Client moveing:");
-	  console.log(data);
-	  rooms.emit("SR_moveBot",data);
-  });
-		//client´s parameters configuration
-  socket.on("CS_reqConfig",function(data){
-	  console.log("Requet client config");
-	  rooms.emit("SR_reqConfig",data);
-  });
-  
-  socket.on("SS_resConfig",function(data){
-	  console.log("Response client config");
-	  rooms.emit("CR_resConfig",data);
-  });
-  socket.on("SS_explosion",function(data){
-	  console.log("Explosion produced:");
-	  console.log(data);
-	  rooms.emit("CR_explosion",data);
-  });
-  
+app.get('/hello', function(req, res) {
+    res.status(200).send('<h1>Hello world</h1>');
 });
 
 
-server.listen(3000, function(){
-	exec('java -cp "physicsServer.jar" physics_server.Main', (err, stdout, stderr) => {
-		if(err)
-			console.log(err);
-		else
-			console.log("java running")
-	})
-  console.log('listening on *:3000');
+var rooms = {};
+io.on('connection', (socket)=>{    
+    socket.on('room', (data) => {
+        if(typeof(data) === "string"){
+            try{
+                data = JSON.parse(data);                
+            } catch (err){
+                console.log(err);
+                return socket.disconnect();
+            }
+        }
+        var room = data["room"];
+        var isServer = data.isServer || false;
+        var config = data.config || "";
+
+        console.log("Room: "+room);
+        room = "room";  
+        if (!(room in rooms)){
+            rooms[room] = new Room(); 
+        }
+
+        socket.join(room);       
+
+        // si es una instancia de servidor y la sala no tiene ya asignado uno
+        if(isServer && !rooms[room].hasServer()){ 
+            rooms[room].setServer(socket.id);
+            rooms[room].setConfig(config);
+            handleServerConnection(room, socket);       
+        
+        // si es un jugador
+        } else if (!isServer){
+            if(!rooms[room].hasServer()){
+                rooms[room].initServer();
+            }
+            if(!rooms[room].hasPlayer(socket.id)){
+                rooms[room].addPlayer(socket.id);
+            }
+            //socket.to(socket.id).emit("config", config);
+            handlePlayerConnection(room, socket);      
+        } else {
+            // no se ha podido conectar
+            socket.disconnect();
+        }
+    });
+});
+
+function handleServerConnection(room, socket){   
+    var emit = emitFunctions(room, socket);
+    
+    socket.on('create_asteroid', emit.asteroid.create);
+    socket.on('delete_asteroid', emit.asteroid.delete);
+    socket.on('create_shot', emit.shot.create);
+    socket.on('delete_shot', emit.shot.delete);
+    socket.on('create_explosion', emit.explosion.create);
+    socket.on('update_player_position', emit.player.update);
+
+    socket.on('disconnect', ()=>{
+        console.log("Server disconnected");
+        deleteRoom(room);
+    }); 
+}
+
+function handlePlayerConnection(room, socket) {
+    var emit = emitFunctions(room, socket);
+
+    socket.on('move_player', emit.player.move);
+
+    socket.on('disconnect', () => {
+        console.log("Client disconnected");
+        var playerPosition = rooms[room].getPlayerPosition(socket.id); 
+        rooms[room].removePlayer(playerPosition);
+    }); 
+}
+
+function emitFunctions (room, socket) {
+    return {
+        asteroid: {
+            create: function(data){     
+                console.log("Asteroid created")
+                socket.in(room).broadcast.emit("create_asteroid", data);
+            },
+            delete: function(data){
+                console.log("Asteroid deleted");
+                socket.in(room).broadcast.emit("delete_asteroid", data);                
+            }
+        },
+        shot: {
+            create: function (data) {
+                console.log("Shot created");
+                socket.in(room).broadcast.emit("create_shot", data);
+            },
+            delete: function (data) {
+                console.log("Shot deleted");
+                socket.in(room).broadcast.emit("delete_shot", data);
+            }
+        },
+        explosion: {
+            create: function(data){
+                console.log("Explosion created");
+                socket.in(room).broadcast.emit("create_explosion", data);
+            }
+        },
+        player: {
+            update: function(data){                
+                socket.in(room).broadcast.emit("update_player_position", data);
+            },
+            move: function(data){
+                var server = rooms[room].getServer();
+                var playerPosition = rooms[room].getPlayerPosition(socket.id);                
+                data = [data]
+                data.push(playerPosition);
+                socket.in(server).volatile.emit("move_player", data);
+            }
+        }
+    };
+}
+
+function deleteRoom(room){
+    if (room in rooms) {
+        if (room in io.sockets.adapter.rooms){
+            for(var clientId in io.sockets.adapter.rooms[room].sockets){
+                io.sockets.connected[clientId].disconnect();
+            }
+        }        
+        delete rooms[room];        
+    }
+}
+
+
+server.listen(3000, function() {
+    console.log('listening on *:3000');
 });
