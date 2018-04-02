@@ -129,13 +129,13 @@ function emitFunctions (room, socket) {
                 data.push(playerPosition);
                 socket.in(server).volatile.emit("move_player", data);
             },
-			lives: function(data){
-				console.log("Lives updated:");
-				socket.in(room).broadcast.emit("update_player_lives", data);
-			},
-			death: function(data){
-				console.log("State player updated");
-				socket.in(room).broadcast.emit("update_player_death", data);
+            lives: function(data){
+                console.log("Lives updated:");
+                socket.in(room).broadcast.emit("update_player_lives", data);
+            },
+            death: function(data){
+                console.log("State player updated");
+                socket.in(room).broadcast.emit("update_player_death", data);
 			}
         }
     };
