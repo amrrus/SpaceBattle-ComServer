@@ -69,8 +69,8 @@ function handleServerConnection(room, socket){
     socket.on('delete_shot', emit.shot.delete);
     socket.on('create_explosion', emit.explosion.create);
     socket.on('update_player_position', emit.player.update);
-	socket.on('update_player_lives', emit.player.lives);
-	socket.on('update_player_death', emit.player.death);
+    socket.on('update_player_lives', emit.player.lives);
+    socket.on('update_player_death', emit.player.death);
 
     socket.on('disconnect', ()=>{
         console.log("Server disconnected");
