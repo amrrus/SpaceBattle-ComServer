@@ -69,6 +69,8 @@ function handleServerConnection(room, socket){
     socket.on('delete_shot', emit.shot.delete);
     socket.on('create_explosion', emit.explosion.create);
     socket.on('update_player_position', emit.player.update);
+	socket.on('update_player_lives', emit.player.lives);
+	socket.on('update_player_death', emit.player.death);
 
     socket.on('disconnect', ()=>{
         console.log("Server disconnected");
@@ -92,7 +94,7 @@ function emitFunctions (room, socket) {
     return {
         asteroid: {
             create: function(data){     
-                console.log("Asteroid created")
+                console.log("Asteroid created");
                 socket.in(room).broadcast.emit("create_asteroid", data);
             },
             delete: function(data){
@@ -123,10 +125,18 @@ function emitFunctions (room, socket) {
             move: function(data){
                 var server = rooms[room].getServer();
                 var playerPosition = rooms[room].getPlayerPosition(socket.id);                
-                data = [data]
+                data = [data];
                 data.push(playerPosition);
                 socket.in(server).volatile.emit("move_player", data);
-            }
+            },
+			lives: function(data){
+				console.log("Lives updated:");
+				socket.in(room).broadcast.emit("update_player_lives", data);
+			},
+			death: function(data){
+				console.log("State player updated");
+				socket.in(room).broadcast.emit("update_player_death", data);
+			}
         }
     };
 }
