@@ -71,6 +71,7 @@ function handleServerConnection(room, socket){
     socket.on('update_player_position', emit.player.update);
     socket.on('update_player_lives', emit.player.lives);
     socket.on('update_player_death', emit.player.death);
+    socket.on('update_player_shots', emit.player.shots);
 
     socket.on('disconnect', ()=>{
         console.log("Server disconnected");
@@ -82,6 +83,7 @@ function handlePlayerConnection(room, socket) {
     var emit = emitFunctions(room, socket);
 
     socket.on('move_player', emit.player.move);
+    socket.on('player_shooting', emit.player.shooting);
 
     socket.on('disconnect', () => {
         console.log("Client disconnected");
@@ -127,7 +129,7 @@ function emitFunctions (room, socket) {
                 var playerPosition = rooms[room].getPlayerPosition(socket.id);                
                 data = [data];
                 data.push(playerPosition);
-                socket.in(server).volatile.emit("move_player", data);
+                socket.in(server).emit("move_player", data);
             },
             lives: function(data){
                 console.log("Lives updated:");
@@ -136,7 +138,20 @@ function emitFunctions (room, socket) {
             death: function(data){
                 console.log("State player updated");
                 socket.in(room).broadcast.emit("update_player_death", data);
-			}
+			},
+            shooting: function(data){
+                console.log("player shooting: "+data.toString());
+                var server = rooms[room].getServer();
+                var playerPosition = rooms[room].getPlayerPosition(socket.id);                
+                data = [data];
+                data.push(playerPosition);
+                socket.in(server).emit("player_shooting", data);
+                
+            },
+            shots: function(data){
+                console.log("Update player shots");
+                socket.in(room).broadcast.emit("update_player_shots", data);
+            }
         }
     };
 }
@@ -147,8 +162,8 @@ function deleteRoom(room){
             for(var clientId in io.sockets.adapter.rooms[room].sockets){
                 io.sockets.connected[clientId].disconnect();
             }
-        }        
-        delete rooms[room];        
+        }
+        delete rooms[room];
     }
 }
 
