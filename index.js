@@ -70,8 +70,8 @@ function handleServerConnection(room, socket){
     socket.on('create_explosion', emit.explosion.create);
     socket.on('update_player_position', emit.player.update);
     socket.on('update_player_lives', emit.player.lives);
-    socket.on('update_player_death', emit.player.death);
     socket.on('update_player_shots', emit.player.shots);
+    socket.on('end_game', emit.game.end);
 
     socket.on('disconnect', ()=>{
         console.log("Server disconnected");
@@ -96,27 +96,27 @@ function emitFunctions (room, socket) {
     return {
         asteroid: {
             create: function(data){     
-                console.log("Asteroid created");
+                //console.log("Asteroid created");
                 socket.in(room).broadcast.emit("create_asteroid", data);
             },
             delete: function(data){
-                console.log("Asteroid deleted");
+                //console.log("Asteroid deleted");
                 socket.in(room).broadcast.emit("delete_asteroid", data);                
             }
         },
         shot: {
             create: function (data) {
-                console.log("Shot created");
+                //console.log("Shot created");
                 socket.in(room).broadcast.emit("create_shot", data);
             },
             delete: function (data) {
-                console.log("Shot deleted");
+                //console.log("Shot deleted");
                 socket.in(room).broadcast.emit("delete_shot", data);
             }
         },
         explosion: {
             create: function(data){
-                console.log("Explosion created");
+                //console.log("Explosion created");
                 socket.in(room).broadcast.emit("create_explosion", data);
             }
         },
@@ -132,25 +132,40 @@ function emitFunctions (room, socket) {
                 socket.in(server).emit("move_player", data);
             },
             lives: function(data){
-                console.log("Lives updated:");
+                //console.log("Lives updated:");
                 socket.in(room).broadcast.emit("update_player_lives", data);
             },
-            death: function(data){
-                console.log("State player updated");
-                socket.in(room).broadcast.emit("update_player_death", data);
-			},
             shooting: function(data){
-                console.log("player shooting: "+data.toString());
+                console.log("player shooting: "+data);
                 var server = rooms[room].getServer();
                 var playerPosition = rooms[room].getPlayerPosition(socket.id);                
                 data = [data];
                 data.push(playerPosition);
                 socket.in(server).emit("player_shooting", data);
-                
             },
             shots: function(data){
-                console.log("Update player shots");
+                console.log("Update player shots"+data);
                 socket.in(room).broadcast.emit("update_player_shots", data);
+            }
+        },
+        game:{
+            start:function(data){
+                console.log("Starting game.");
+                socket.in(room).broadcast.emit("start_game", data);
+            },
+            end: function(data){
+                console.log("Ending game:");
+                var server = rooms[room].getServer();
+                var loser = data["loser"];
+                rooms[room].getPlayers().forEach(
+                    function (id, index, arr){
+                        console.log("id:"+id);
+                        var msg = {"loser":loser == index};
+                        socket.in(id).emit("end_game", msg);
+                    }
+                );
+                rooms[room].stopServer();
+                deleteRoom(room);
             }
         }
     };
@@ -163,7 +178,8 @@ function deleteRoom(room){
                 io.sockets.connected[clientId].disconnect();
             }
         }
-        delete rooms[room];
+        
+        setTimeout(delete rooms[room],5000);
     }
 }
 
