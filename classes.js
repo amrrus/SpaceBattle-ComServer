@@ -1,12 +1,13 @@
 var _ = require('lodash');
 var exec = require('child_process').exec;
-
+    
 class Room {
 
     constructor(bp = null, tp = null, serv = null) {
         this.config = null;    
         this.players = [bp, tp];
         this.server = serv;
+        this.pid=-1;
     }
 
     getPlayers() {
@@ -55,8 +56,8 @@ class Room {
         this.config = config;
     }
 
-    initServer(){
-        this.serverExecution = exec('java -cp "physicsServer.jar" physics_server.Main', (err, stdout, stderr) => {
+    initServer(room){
+        this.serverExecution = exec('java -jar "physicsServer.jar" '+room, (err, stdout, stderr) => {
             console.log(err);
             console.log(stdout);
             console.log(stderr);
@@ -64,14 +65,16 @@ class Room {
                 console.log(err);
             else
                 console.log("java running")
-        })
+        });
+        this.pid=this.serverExecution._handle['pid'];
     }
     stopServer(){
         console.log("Stop server")        
         // TODO: NO FUNCIONA (NO SE MATA EL PROCESO)
-        this.serverExecution.stdin.pause();
-        this.serverExecution.kill();
+        //this.serverExecution.stdin.pause();
+        //this.serverExecution.kill();
     }
+    
 }
 
 module.exports.Room = Room;

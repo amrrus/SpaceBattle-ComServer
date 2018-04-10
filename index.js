@@ -45,14 +45,18 @@ io.on('connection', (socket)=>{
         
         // si es un jugador
         } else if (!isServer){
-            if(!rooms[room].hasServer()){
-                rooms[room].initServer();
-            }
+            //if(!rooms[room].hasServer()){
+            //    rooms[room].initServer(room);
+            //}
             if(!rooms[room].hasPlayer(socket.id)){
                 rooms[room].addPlayer(socket.id);
             }
             //socket.to(socket.id).emit("config", config);
-            handlePlayerConnection(room, socket);      
+            handlePlayerConnection(room, socket);   
+            console.log("condicion:"+(!(rooms[room].getPlayers().includes(null))));
+            if(!(rooms[room].getPlayers().includes(null))){
+                startSecuence(room,socket);
+            }
         } else {
             // no se ha podido conectar
             socket.disconnect();
@@ -164,8 +168,28 @@ function emitFunctions (room, socket) {
                         socket.in(id).emit("end_game", msg);
                     }
                 );
-                rooms[room].stopServer();
+                //rooms[room].stopServer();
                 deleteRoom(room);
+            }
+        },
+        rooms:{
+            create:function(data){
+                
+            },
+            delete:function(data){
+                
+            },
+            update:function(){
+                
+            },
+            created:function(){
+                
+            },
+            deleted:function(){
+                
+            },
+            add_player:function(){
+                
             }
         }
     };
@@ -183,6 +207,17 @@ function deleteRoom(room){
     }
 }
 
+function startSecuence(room,socket){
+    console.log("start secuence");
+    var server = rooms[room].getServer();
+                   
+    io.sockets.in(room).emit("start_game", {});
+    io.sockets.in(room).emit("countdown", 3);
+    setTimeout(function () {   io.sockets.in(room).emit("countdown", 2)    },1000);
+    setTimeout(function () {   rooms[room].initServer(room)                },2000); 
+    setTimeout(function () {   io.sockets.in(room).emit("countdown", 1)    },2000);
+    setTimeout(function () {   io.sockets.in(room).emit("countdown", 0)    },3000);
+}
 
 server.listen(3000, function() {
     console.log('listening on *:3000');
