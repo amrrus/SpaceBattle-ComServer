@@ -14,6 +14,7 @@ app.get('/hello', function(req, res) {
 });
 
 
+
 var rooms = {};
 io.on('connection', (socket)=>{    
     socket.on('room', (data) => {
@@ -30,7 +31,7 @@ io.on('connection', (socket)=>{
         var config = data.config || "";
 
         console.log("Room: "+room);
-        room = "room";  
+        //room = "room";  
         if (!(room in rooms)){
             rooms[room] = new Room(); 
         }
@@ -174,6 +175,12 @@ function emitFunctions (room, socket) {
         },
         rooms:{
             create:function(data){
+                var nameRoom = data["name"];
+                var nickName = data["nickname"];
+                //warnning concurrency and asynchronous
+                indexRooms++;
+                rooms[indexRooms] = new Room();
+                socket.emit("created_room",indexRooms);
                 
             },
             delete:function(data){
@@ -203,7 +210,7 @@ function deleteRoom(room){
             }
         }
         
-        setTimeout(delete rooms[room],5000);
+        setTimeout(function(){delete rooms[room]},5000);
     }
 }
 
