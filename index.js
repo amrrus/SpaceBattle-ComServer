@@ -43,7 +43,7 @@ io.on('connection', (socket)=>{
         
     });
     socket.on('create_room', () => {        
-
+        
         var room = users[socket.id];                
 
         console.log("Create room: " + room);        
@@ -62,7 +62,7 @@ io.on('connection', (socket)=>{
         delete rooms[users[socket.id]];
     });
 
-    socket.on('room', (data)=>{
+    socket.on('join_room_server', (data)=>{
         console.log("Server connected");
 
         [err, data] = parseJSON(data);
@@ -71,6 +71,7 @@ io.on('connection', (socket)=>{
             return emitError(socket, 'join_room_server', 'Error parsing JSON');// TODO: handle error on server
         }
 
+        socket.join(data.room);
         rooms[data.room].setServer(socket.id);
         rooms[data.room].setConfig(data.config);
         handleServerGameConnections(data.room, socket);       
