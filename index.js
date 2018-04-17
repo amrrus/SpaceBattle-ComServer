@@ -16,56 +16,78 @@ app.get('/hello', function(req, res) {
 
 
 var rooms = {};
+var users = {};
 io.on('connection', (socket)=>{    
-    socket.on('room', (data) => {
-        if(typeof(data) === "string"){
-            try{
-                data = JSON.parse(data);                
-            } catch (err){
-                console.log(err);
-                return socket.disconnect();
-            }
-        }
-        var room = data["room"];
-        var isServer = data.isServer || false;
-        var config = data.config || "";
+    console.log('Connected');
+    
+    users[socket.id] = socket.id + "-nickname"; // TODO: use nickname
+    console.log(users);
 
-        console.log("Room: "+room);
-        //room = "room";  
-        if (!(room in rooms)){
-            rooms[room] = new Room(); 
-        }
-
-        socket.join(room);       
-
-        // si es una instancia de servidor y la sala no tiene ya asignado uno
-        if(isServer && !rooms[room].hasServer()){ 
-            rooms[room].setServer(socket.id);
-            rooms[room].setConfig(config);
-            handleServerConnection(room, socket);       
-        
-        // si es un jugador
-        } else if (!isServer){
-            //if(!rooms[room].hasServer()){
-            //    rooms[room].initServer(room);
-            //}
-            if(!rooms[room].hasPlayer(socket.id)){
-                rooms[room].addPlayer(socket.id);
-            }
-            //socket.to(socket.id).emit("config", config);
-            handlePlayerConnection(room, socket);   
-            console.log("condicion:"+(!(rooms[room].getPlayers().includes(null))));
-            if(!(rooms[room].getPlayers().includes(null))){
-                startSecuence(room,socket);
-            }
-        } else {
-            // no se ha podido conectar
-            socket.disconnect();
-        }
+    socket.on('get_rooms', ()=>{
+        console.log("Get rooms");
+        socket.emit('get_rooms', {rooms: _.keys(rooms)});
     });
+    socket.on('join_room', (data)=>{
+        [err, data] = parseJSON(data);
+        if (err) return emitError(socket, 'join_room', 'Error parsing JSON');// TODO: handle error on client       
+
+        // room key must be in data object. Room must exist. The room cannot be full of players.
+        if ( ('room' in data) && (data.room in rooms) && rooms[data.room].addPlayer(socket.id) !== -1){
+            console.log(`User ${users[socket.id]} entered to room ${data.room}`);        
+            socket.join(data.room);       
+
+            startSequence(data.room);            
+        }else{
+            return emitError(socket, 'join_room', "Error at entering room");// TODO: handle error on client
+        }
+        
+    });
+    socket.on('create_room', () => {        
+
+        var room = users[socket.id];                
+
+        console.log("Create room: " + room);        
+
+        if (!(room in rooms)){
+            rooms[room] = new Room();
+        }else{
+            return emitError(socket, 'create_room_error', 'Room already exists');// TODO: handle error on client
+        }
+
+        socket.join(room);
+        rooms[room].addPlayer(socket.id);    
+    });
+
+    socket.on('delete_room', () => {
+        delete rooms[users[socket.id]];
+    });
+
+    socket.on('room', (data)=>{
+        console.log("Server connected");
+
+        [err, data] = parseJSON(data);
+        if (err) {
+            console.log(err);
+            return emitError(socket, 'join_room_server', 'Error parsing JSON');// TODO: handle error on server
+        }
+
+        rooms[data.room].setServer(socket.id);
+        rooms[data.room].setConfig(data.config);
+        handleServerGameConnections(data.room, socket);       
+
+    });
+
+    socket.on('disconnect', ()=>{
+        console.log("Socket disconnected: "+ socket.id);
+
+        if( socket.id in users){
+            deleteRoom(users[socket.id]);
+            delete users[socket.id];
+        }
+    })
 });
 
-function handleServerConnection(room, socket){   
+function handleServerGameConnections(room, socket){   
     var emit = emitFunctions(room, socket);
     
     socket.on('create_asteroid', emit.asteroid.create);
@@ -77,24 +99,13 @@ function handleServerConnection(room, socket){
     socket.on('update_player_lives', emit.player.lives);
     socket.on('update_player_shots', emit.player.shots);
     socket.on('end_game', emit.game.end);
-
-    socket.on('disconnect', ()=>{
-        console.log("Server disconnected");
-        deleteRoom(room);
-    }); 
 }
 
-function handlePlayerConnection(room, socket) {
+function handlePlayerGameConnections(room, socket) {
     var emit = emitFunctions(room, socket);
 
     socket.on('move_player', emit.player.move);
     socket.on('player_shooting', emit.player.shooting);
-
-    socket.on('disconnect', () => {
-        console.log("Client disconnected");
-        var playerPosition = rooms[room].getPlayerPosition(socket.id); 
-        rooms[room].removePlayer(playerPosition);
-    }); 
 }
 
 function emitFunctions (room, socket) {
@@ -141,7 +152,7 @@ function emitFunctions (room, socket) {
                 socket.in(room).broadcast.emit("update_player_lives", data);
             },
             shooting: function(data){
-                console.log("player shooting: "+data);
+                //console.log("player shooting: "+data);
                 var server = rooms[room].getServer();
                 var playerPosition = rooms[room].getPlayerPosition(socket.id);                
                 data = [data];
@@ -149,17 +160,17 @@ function emitFunctions (room, socket) {
                 socket.in(server).emit("player_shooting", data);
             },
             shots: function(data){
-                console.log("Update player shots"+data);
+                //console.log("Update player shots"+data);
                 socket.in(room).broadcast.emit("update_player_shots", data);
             }
         },
         game:{
             start:function(data){
-                console.log("Starting game.");
+                console.log("Starting game");
                 socket.in(room).broadcast.emit("start_game", data);
             },
             end: function(data){
-                console.log("Ending game:");
+                console.log("Ending game");
                 var server = rooms[room].getServer();
                 var loser = data["loser"];
                 rooms[room].getPlayers().forEach(
@@ -169,7 +180,8 @@ function emitFunctions (room, socket) {
                         socket.in(id).emit("end_game", msg);
                     }
                 );
-                //rooms[room].stopServer();
+                io.sockets.connected[server].disconnect();
+                rooms[room].stopServer();
                 deleteRoom(room);
             }
         },
@@ -206,24 +218,51 @@ function deleteRoom(room){
     if (room in rooms) {
         if (room in io.sockets.adapter.rooms){
             for(var clientId in io.sockets.adapter.rooms[room].sockets){
-                io.sockets.connected[clientId].disconnect();
+                removeGameListeners(io.sockets.connected[clientId]);
+                io.sockets.connected[clientId].leave(room);
             }
         }
         
-        setTimeout(function(){delete rooms[room]},5000);
+        delete rooms[room];
     }
 }
 
-function startSecuence(room,socket){
-    console.log("start secuence");
-    var server = rooms[room].getServer();
-                   
+function removeGameListeners(socket){
+    var events = ['move_player', 'player_shooting'];
+    events.forEach((event, index, array)=>{
+        socket.removeListener(event, ()=>{});
+    });
+}
+
+function startSequence(room){
+    console.log("Start sequence");
+
+    _.forEach(io.sockets.adapter.rooms[room].sockets, (value, socketId)=>{
+        handlePlayerGameConnections(room, io.sockets.connected[socketId]);
+    });
+
+    rooms[room].initServer(room)
     io.sockets.in(room).emit("start_game", {});
     io.sockets.in(room).emit("countdown", 3);
-    setTimeout(function () {   io.sockets.in(room).emit("countdown", 2)    },1000);
-    setTimeout(function () {   rooms[room].initServer(room)                },2000); 
+    setTimeout(function () {   io.sockets.in(room).emit("countdown", 2)    },1000);    
     setTimeout(function () {   io.sockets.in(room).emit("countdown", 1)    },2000);
     setTimeout(function () {   io.sockets.in(room).emit("countdown", 0)    },3000);
+}
+
+function parseJSON(data){
+    if (typeof (data) !== 'string') {
+        data = JSON.stringify(data);
+    }
+    
+    try {        
+        return [null, JSON.parse(data)];
+    }catch(err){
+        return [err, undefined];
+    }
+}
+
+function emitError(socket, event, msg){
+    return socket.in(socket.id).emit(event, {error: msg});
 }
 
 server.listen(3000, function() {

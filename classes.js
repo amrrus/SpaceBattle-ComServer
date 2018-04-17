@@ -70,9 +70,8 @@ class Room {
     }
     stopServer(){
         console.log("Stop server")        
-        // TODO: NO FUNCIONA (NO SE MATA EL PROCESO)
-        //this.serverExecution.stdin.pause();
-        //this.serverExecution.kill();
+        this.serverExecution.stdin.pause();
+        this.serverExecution.kill('SIGINT');
     }
     
 }
