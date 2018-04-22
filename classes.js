@@ -58,20 +58,13 @@ class Room {
 
     initServer(room){
         this.serverExecution = exec('java -jar "physicsServer.jar" '+room, (err, stdout, stderr) => {
-            console.log(err);
-            console.log(stdout);
-            console.log(stderr);
-            if (err)
-                console.log(err);
-            else
-                console.log("java running")
         });
         this.pid=this.serverExecution._handle['pid'];
     }
     stopServer(){
-        console.log("Stop server")        
-        this.serverExecution.stdin.pause();
-        this.serverExecution.kill('SIGINT');
+        console.log("Stop server");        
+        //this.serverExecution.stdin.pause();
+        this.serverExecution.kill('SIGKILL');
     }
     
 }

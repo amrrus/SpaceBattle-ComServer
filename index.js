@@ -9,10 +9,9 @@ var io = require('socket.io')(server, {
     pingTimeout: 20000
 });
 
-app.get('/hello', function(req, res) {
-    res.status(200).send('<h1>Hello world</h1>');
+app.get('*', function(req, res) {
+    res.status(200).send('<h1>Servidor de SpaceBattle</h1>');
 });
-
 
 
 var rooms = {};
@@ -21,7 +20,7 @@ io.on('connection', (socket)=>{
     console.log('Connected');
     
     users[socket.id] = socket.id + "-nickname"; // TODO: use nickname
-    console.log(users);
+    console.log(`Usuarios conectados: ${JSON.stringify(users)}`);
 
     socket.on('get_rooms', ()=>{
         console.log("Get rooms");
@@ -44,7 +43,7 @@ io.on('connection', (socket)=>{
     });
     socket.on('create_room', () => {        
         
-        var room = users[socket.id];                
+        var room = users[socket.id] + "-room";                
 
         console.log("Create room: " + room);        
 
@@ -59,7 +58,7 @@ io.on('connection', (socket)=>{
     });
 
     socket.on('delete_room', () => {
-        delete rooms[users[socket.id]];
+        delete rooms[users[socket.id]+"-room"];
     });
 
     socket.on('join_room_server', (data)=>{
@@ -82,7 +81,7 @@ io.on('connection', (socket)=>{
         console.log("Socket disconnected: "+ socket.id);
 
         if( socket.id in users){
-            deleteRoom(users[socket.id]);
+            deleteRoom(users[socket.id]+"-room");
             delete users[socket.id];
         }
     })
@@ -100,6 +99,13 @@ function handleServerGameConnections(room, socket){
     socket.on('update_player_lives', emit.player.lives);
     socket.on('update_player_shots', emit.player.shots);
     socket.on('end_game', emit.game.end);
+
+    socket.removeAllListeners('disconnect');
+    socket.on('disconnect', () => {
+        console.log("Server disconnected: " + socket.id);
+
+        rooms[room].stopServer();
+    })
 }
 
 function handlePlayerGameConnections(room, socket) {
@@ -179,10 +185,10 @@ function emitFunctions (room, socket) {
                         console.log("id:"+id);
                         var msg = {"loser":loser == index};
                         socket.in(id).emit("end_game", msg);
-                    }
+                     }
                 );
-                io.sockets.connected[server].disconnect();
                 rooms[room].stopServer();
+                io.sockets.connected[server].disconnect();
                 deleteRoom(room);
             }
         },
@@ -221,6 +227,10 @@ function deleteRoom(room){
             for(var clientId in io.sockets.adapter.rooms[room].sockets){
                 removeGameListeners(io.sockets.connected[clientId]);
                 io.sockets.connected[clientId].leave(room);
+
+                if (rooms[room].getServer() == clientId){
+                    io.sockets.connected[clientId].disconnect();
+                }
             }
         }
         
@@ -228,26 +238,32 @@ function deleteRoom(room){
     }
 }
 
-function removeGameListeners(socket){
+function removeGameListeners(socket){    
     var events = ['move_player', 'player_shooting'];
     events.forEach((event, index, array)=>{
-        socket.removeListener(event, ()=>{});
+        socket.removeAllListeners(event);
     });
 }
 
 function startSequence(room){
-    console.log("Start sequence");
-
-    _.forEach(io.sockets.adapter.rooms[room].sockets, (value, socketId)=>{
-        handlePlayerGameConnections(room, io.sockets.connected[socketId]);
-    });
+    console.log("Start sequence");  
 
     rooms[room].initServer(room)
     io.sockets.in(room).emit("start_game", {});
     io.sockets.in(room).emit("countdown", 3);
     setTimeout(function () {   io.sockets.in(room).emit("countdown", 2)    },1000);    
     setTimeout(function () {   io.sockets.in(room).emit("countdown", 1)    },2000);
-    setTimeout(function () {   io.sockets.in(room).emit("countdown", 0)    },3000);
+    setTimeout(function () {
+        io.sockets.in(room).emit("countdown", 0); 
+        
+        if (room in io.sockets.adapter.rooms){
+            _.forEach(io.sockets.adapter.rooms[room].sockets, (value, socketId) => {
+                handlePlayerGameConnections(room, io.sockets.connected[socketId]);
+            })
+        };    
+    },3000);
+
+
 }
 
 function parseJSON(data){
