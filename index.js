@@ -31,18 +31,21 @@ io.on('connection', (socket)=>{
         if (err) return emitError(socket, 'join_room', 'Error parsing JSON');// TODO: handle error on client       
 
         // room key must be in data object. Room must exist. The room cannot be full of players.
-        if ( ('room' in data) && (data.room in rooms) && rooms[data.room].addPlayer(socket.id) !== -1){
-            console.log(`User ${users[socket.id]} entered to room ${data.room}`);        
+        if ( ('room' in data) && ('nickName' in data) && (data.room in rooms) && rooms[data.room].addPlayer(socket.id,data.nickName) !== -1){
+            console.log(`User ${users[socket.id]} entered to room ${data.room}`); 
             socket.join(data.room);       
-
+			
             startSequence(data.room);            
         }else{
             return emitError(socket, 'join_room', "Error at entering room");// TODO: handle error on client
         }
         
     });
-    socket.on('create_room', () => {        
-        
+    socket.on('create_room', (data) => {        
+        [err, data] = parseJSON(data);
+        if (err) return emitError(socket, 'create_room', 'Error parsing JSON');// TODO: handle error on client       
+		
+		console.log(`User ${data.nickName} created room.`); 
         var room = users[socket.id] + "-room";                
 
         console.log("Create room: " + room);        
@@ -52,9 +55,8 @@ io.on('connection', (socket)=>{
         }else{
             return emitError(socket, 'create_room_error', 'Room already exists');// TODO: handle error on client
         }
-
-        socket.join(room);
-        rooms[room].addPlayer(socket.id);    
+		socket.join(room);
+		rooms[room].addPlayer(socket.id,data.nickName);  
     });
 
     socket.on('delete_room', () => {
@@ -191,32 +193,6 @@ function emitFunctions (room, socket) {
                 io.sockets.connected[server].disconnect();
                 deleteRoom(room);
             }
-        },
-        rooms:{
-            create:function(data){
-                var nameRoom = data["name"];
-                var nickName = data["nickname"];
-                //warnning concurrency and asynchronous
-                indexRooms++;
-                rooms[indexRooms] = new Room();
-                socket.emit("created_room",indexRooms);
-                
-            },
-            delete:function(data){
-                
-            },
-            update:function(){
-                
-            },
-            created:function(){
-                
-            },
-            deleted:function(){
-                
-            },
-            add_player:function(){
-                
-            }
         }
     };
 }
@@ -248,12 +224,31 @@ function removeGameListeners(socket){
 function startSequence(room){
     console.log("Start sequence");  
 
-    rooms[room].initServer(room)
-    io.sockets.in(room).emit("start_game", {});
-    io.sockets.in(room).emit("countdown", 3);
-    setTimeout(function () {   io.sockets.in(room).emit("countdown", 2)    },1000);    
-    setTimeout(function () {   io.sockets.in(room).emit("countdown", 1)    },2000);
+    
+    io.sockets.in(room).emit("start_game", {"bottom_player_name": rooms[room].getPlayersName()[0],
+											"top_player_name":rooms[room].getPlayersName()[1]}
+							);
+	console.log("countdown started");  
+    
+	setTimeout(function () {
+		io.sockets.in(room).emit("show_game_screen", {});
+		console.log("countdown 3");
+		io.sockets.in(room).emit("countdown", 3);
+	},3000);
+	
     setTimeout(function () {
+		console.log("countdown 2");
+		rooms[room].initServer(room);
+		io.sockets.in(room).emit("countdown", 2);
+	},4000);
+	
+    setTimeout(function () {   
+		console.log("countdown 1");
+		io.sockets.in(room).emit("countdown", 1);
+	},5000);
+	
+    setTimeout(function () {
+		console.log("countdown 0");
         io.sockets.in(room).emit("countdown", 0); 
         
         if (room in io.sockets.adapter.rooms){
@@ -261,7 +256,7 @@ function startSequence(room){
                 handlePlayerGameConnections(room, io.sockets.connected[socketId]);
             })
         };    
-    },3000);
+    },6000);
 
 
 }

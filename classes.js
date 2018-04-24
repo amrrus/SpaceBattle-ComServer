@@ -6,6 +6,7 @@ class Room {
     constructor(bp = null, tp = null, serv = null) {
         this.config = null;    
         this.players = [bp, tp];
+		this.playersName = ["bot","top"];
         this.server = serv;
         this.pid=-1;
     }
@@ -13,6 +14,10 @@ class Room {
     getPlayers() {
         return this.players;
     }
+	
+	getPlayersName(){
+		return this.playersName;
+	}
 
     getServer() {
         return this.server;
@@ -30,7 +35,7 @@ class Room {
         return _.includes(this.getPlayers(), idPlayer);
     }
 
-    addPlayer(id, pos = null) { // pos (position) => null/0/1
+    addPlayer(id, nickName= "...", pos = null) { // pos (position) => null/0/1
         var index = -1;
         if (_.isUndefined(this.getPlayers()[pos])){
             index = _.indexOf(this.getPlayers(), null);
@@ -38,6 +43,7 @@ class Room {
 
         if (_.isNull(this.getPlayers()[index])) {
             this.players[index] = id;
+			this.playersName[index]=nickName;
             return index;
         } else {
             return -1;
