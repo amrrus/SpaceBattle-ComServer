@@ -4,7 +4,7 @@ var exec = require('child_process').exec;
 class Room {
 
     constructor(bp = null, tp = null, serv = null) {
-        this.config = null;    
+        this.config = "";    
         this.players = [bp, tp];
 		this.playersName = ["bot","top"];
         this.server = serv;
@@ -58,6 +58,10 @@ class Room {
         return _.indexOf(this.getPlayers(), id);
     }
 
+	getConfig(){
+		return this.config;
+	}
+	
     setConfig(config) {
         this.config = config;
     }

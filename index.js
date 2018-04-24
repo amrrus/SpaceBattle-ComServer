@@ -74,7 +74,7 @@ io.on('connection', (socket)=>{
 
         socket.join(data.room);
         rooms[data.room].setServer(socket.id);
-        rooms[data.room].setConfig(data.config);
+        rooms[data.room].setConfig(data.config);	
         handleServerGameConnections(data.room, socket);       
 
     });
@@ -101,6 +101,7 @@ function handleServerGameConnections(room, socket){
     socket.on('update_player_lives', emit.player.lives);
     socket.on('update_player_shots', emit.player.shots);
     socket.on('end_game', emit.game.end);
+	socket.on('send_config',emit.game.config);
 
     socket.removeAllListeners('disconnect');
     socket.on('disconnect', () => {
@@ -174,6 +175,10 @@ function emitFunctions (room, socket) {
             }
         },
         game:{
+			config:function(data){
+                console.log("game configuration");
+                socket.in(room).broadcast.emit("handle_config", data);
+            },
             start:function(data){
                 console.log("Starting game");
                 socket.in(room).broadcast.emit("start_game", data);
@@ -226,7 +231,8 @@ function startSequence(room){
 
     
     io.sockets.in(room).emit("start_game", {"bottom_player_name": rooms[room].getPlayersName()[0],
-											"top_player_name":rooms[room].getPlayersName()[1]}
+											"top_player_name":rooms[room].getPlayersName()[1],
+											"con":rooms[room].getConfig()}
 							);
 	console.log("countdown started");  
     
