@@ -19,7 +19,19 @@ var users = {};
 io.on('connection', (socket)=>{    
     console.log('Connected');
     
-    users[socket.id] = socket.id + "-nickname"; // TODO: use nickname
+    //users[socket.id] = socket.id + "-nickname"; // TODO: use nickname
+
+    socket.on('check_nick', (data)=>{
+        if(!(data in users)){//entra en el if pero al crear dos conexiones distintas puedes ponerle el mismo nombre porque 
+            //cada una es una conexión distinta y los nombres no se quedan guardados.
+            users[socket.id] = data;
+            console.log(users);
+            //console.log(`Usuarios: ${JSON.stringify(users)}`);
+            socket.emit('correct_nick', data);
+        }
+    });
+
+
     console.log(`Usuarios conectados: ${JSON.stringify(users)}`);
 
     socket.on('get_rooms', ()=>{
