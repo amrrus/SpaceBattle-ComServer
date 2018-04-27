@@ -22,13 +22,14 @@ io.on('connection', (socket)=>{
     //users[socket.id] = socket.id + "-nickname"; // TODO: use nickname
 
     socket.on('check_nick', (data)=>{
-        if(!(data in users)){//entra en el if pero al crear dos conexiones distintas puedes ponerle el mismo nombre porque 
-            //cada una es una conexión distinta y los nombres no se quedan guardados.
+        var res = false;
+        if(!(Object.values(users)).includes(data)){
             users[socket.id] = data;
-            console.log(users);
-            //console.log(`Usuarios: ${JSON.stringify(users)}`);
-            socket.emit('correct_nick', data);
+            console.log(Object.values(users));
+            res=true;
         }
+        socket.emit('check_nick_result', {"result":res,"send_nick":data});
+
     });
 
 
