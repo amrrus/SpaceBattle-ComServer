@@ -19,13 +19,10 @@ var users = {};
 io.on('connection', (socket)=>{    
     console.log('Connected');
     
-    //users[socket.id] = socket.id + "-nickname"; // TODO: use nickname
-
     socket.on('check_nick', (data)=>{
         var res = false;
-        if(!(Object.values(users)).includes(data)){
+        if (users[socket.id] == data || !(Object.values(users)).includes(data)){
             users[socket.id] = data;
-            console.log(Object.values(users));
             res=true;
         }
         socket.emit('check_nick_result', {"result":res,"send_nick":data});
@@ -65,6 +62,7 @@ io.on('connection', (socket)=>{
 
         if (!(room in rooms)){
             rooms[room] = new Room();
+            rooms[room].setConfig(getDefaultConfig());
         }else{
             return emitError(socket, 'create_room_error', 'Room already exists');// TODO: handle error on client
         }
@@ -87,7 +85,13 @@ io.on('connection', (socket)=>{
 
         socket.join(data.room);
         rooms[data.room].setServer(socket.id);
-        rooms[data.room].setConfig(data.config);	
+
+        let parsedParams = data.config.split(",").reduce((result, param)=>{
+            [paramName, paramValue] = param.split(':');
+            return Object.assign(result, { [paramName]: paramValue});
+        }, {});
+
+        rooms[data.room].setConfig(parsedParams);	
         handleServerGameConnections(data.room, socket);       
 
     });
@@ -245,7 +249,7 @@ function startSequence(room){
     
     io.sockets.in(room).emit("start_game", {"bottom_player_name": rooms[room].getPlayersName()[0],
 											"top_player_name":rooms[room].getPlayersName()[1],
-											"con":rooms[room].getConfig()}
+											"con": Object.entries(rooms[room].getConfig()).map(([pName, pValue])=>{return `${pName}:${pValue}`;}).join(",")}
 							);
 	console.log("countdown started");  
     
@@ -294,6 +298,13 @@ function parseJSON(data){
 
 function emitError(socket, event, msg){
     return socket.in(socket.id).emit(event, {error: msg});
+}
+
+function getDefaultConfig() {
+    return {
+        TIME_SHOT_REGENERATION_INTERVAL: 0.3,
+        TIME_BETWEEN_SHOTS: 0.1
+    };
 }
 
 server.listen(3000, function() {

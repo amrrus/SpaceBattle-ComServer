@@ -4,7 +4,7 @@ var exec = require('child_process').exec;
 class Room {
 
     constructor(bp = null, tp = null, serv = null) {
-        this.config = "";    
+        this.config = {};    
         this.players = [bp, tp];
 		this.playersName = ["bot","top"];
         this.server = serv;
@@ -63,11 +63,15 @@ class Room {
 	}
 	
     setConfig(config) {
-        this.config = config;
-    }
+        Object.assign(this.config, config);
+    }  
 
     initServer(room){
-        this.serverExecution = exec('java -jar "physicsServer.jar" '+room, (err, stdout, stderr) => {
+        let parsedConfig = Object.entries(this.getConfig()).map(([configParam, configValue])=>{
+            return `${configParam} ${configValue}`;
+        }).join(" ");
+
+        this.serverExecution = exec(`java -jar "physicsServer.jar" ${room} ${parsedConfig} `, (err, stdout, stderr) => {
         });
         this.pid=this.serverExecution._handle['pid'];
     }
