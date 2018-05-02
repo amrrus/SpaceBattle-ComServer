@@ -34,7 +34,7 @@ io.on('connection', (socket)=>{
 
     socket.on('get_rooms', ()=>{
         console.log("Get rooms");
-        socket.emit('get_rooms', {rooms: _.keys(rooms)});
+        socket.emit('get_rooms', {rooms: _.keys(_.omitBy(rooms, (roomInstance, roomName)=>{return roomInstance.hasServer()}))});
     });
     socket.on('join_room', (data)=>{
         [err, data] = parseJSON(data);
@@ -100,7 +100,14 @@ io.on('connection', (socket)=>{
         console.log("Socket disconnected: "+ socket.id);
 
         if( socket.id in users){
-            deleteRoom(users[socket.id]+"-room");
+            var room = users[socket.id]+"-room";
+
+            if (room in rooms){
+                var msg = {"loser": rooms[room].getPlayerPosition(socket.id)};
+                socket.in(room).emit("end_game", msg);
+
+                deleteRoom(room);
+            }
             delete users[socket.id];
         }
     })
@@ -260,8 +267,9 @@ function startSequence(room){
 	},3000);
 	
     setTimeout(function () {
-		console.log("countdown 2");
-		rooms[room].initServer(room);
+        console.log("countdown 2");
+        if(room in rooms)
+		    rooms[room].initServer(room);
 		io.sockets.in(room).emit("countdown", 2);
 	},4000);
 	
