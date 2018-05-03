@@ -4,13 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js"
+    "debug": "nodemon index.js",
+    "start": "forever stopall & forever start index.js",
+    "stop": "forever stopall"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "express": "^4.16.2",
+    "forever": "^0.15.3",
     "lodash": "^4.17.10",
     "package.json": "^2.0.1",
     "socket.io": "^2.0.4"
